@@ -4,7 +4,6 @@ use generations::{Clearable, Generations};
 // be impossible for Generations to make more instances of it, which means
 // that its use in our API demonstrates that Generations is always reusing
 // the same 2 instances
-#[derive(Eq, PartialEq, Debug)]
 struct UnconstructableWrapper<T>(T);
 
 impl<T: Clearable> Clearable for UnconstructableWrapper<T> {
