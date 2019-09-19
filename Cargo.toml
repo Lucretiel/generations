@@ -1,0 +1,20 @@
+[package]
+name = "generations"
+version = "0.1.0"
+authors = ["Nathan West <Lucretiel@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+license = "MIT"
+description = "A simple utility for running generation-based simulations in Rust"
+repository = "https://github.com/Lucretiel/generations"
+
+[badges]
+travis-ci = { repository = "Lucretiel/generations" }
+maintenance = { status = "actively-developed" }
+
+[dependencies]
+
+# docs.rs stuff
+[package.metadata.docs.rs]
+all-features = true
+# TODO: fork me on github banner
