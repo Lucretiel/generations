@@ -299,7 +299,8 @@ impl<Model: Clearable> Generations<Model> {
 
 impl<Model: Clone + Clearable> Generations<Model> {
     /// Create a new `Generations` instance with a seed model. Clone the seed
-    /// model to create an initial scratch model.
+    /// model to create an initial scratch model. Note that the scratch model
+    /// is always cleared before each generation step.
     #[inline]
     pub fn new_cloned(seed_generation: Model) -> Self {
         let scratch = seed_generation.clone();
