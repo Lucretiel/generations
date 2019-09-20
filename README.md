@@ -1,6 +1,6 @@
 # generations
 
-Generations is a utility library for running generation-based simulations, such as [Conway's Game of Life](https://www.wikiwand.com/en/Conway%27s_Game_of_Life), other [cellular automata](https://www.wikiwand.com/en/Elementary_cellular_automaton), and [genetic algorithms](https://www.wikiwand.com/en/Genetic_algorithm). Its purpose is to make it unnecessary to allocate new model structures with each generation; instead, two generations instances are stored in a [`Generations`] struct, one of which is always considered the visible "current" generation.
+Generations is a utility library for running generation-based simulations, such as [Conway's Game of Life](https://www.wikiwand.com/en/Conway%27s_Game_of_Life), other [cellular automata](https://www.wikiwand.com/en/Elementary_cellular_automaton), and [genetic algorithms](https://www.wikiwand.com/en/Genetic_algorithm). Its purpose is to make it unnecessary to allocate new model structures with each generation; instead, two generations instances are stored in a `Generations` struct, one of which is always considered the visible "current" generation.
 
 # Example
 
