@@ -66,8 +66,8 @@
 
 use std::collections;
 use std::ffi;
-use std::mem;
 use std::fmt;
+use std::mem;
 
 // TODO: make this derivable
 /// [`Clearable`] is a trait for data structures that can be cleared, especially
@@ -359,7 +359,9 @@ impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> 
     }
 }
 
-impl<Model: fmt::Debug + Clearable, Step: FnMut(&Model, &mut Model)> fmt::Debug for Simulation<Model, Step> {
+impl<Model: fmt::Debug + Clearable, Step: FnMut(&Model, &mut Model)> fmt::Debug
+    for Simulation<Model, Step>
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Simulation")
             .field("generations", &self.generations)
@@ -368,7 +370,9 @@ impl<Model: fmt::Debug + Clearable, Step: FnMut(&Model, &mut Model)> fmt::Debug 
     }
 }
 
-impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> AsRef<Generations<Model>> for Simulation<Model, Step> {
+impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> AsRef<Generations<Model>>
+    for Simulation<Model, Step>
+{
     fn as_ref(&self) -> &Generations<Model> {
         &self.generations
     }
@@ -396,10 +400,7 @@ mod tests {
         //
         // For simplicity of implementation of bounds checking, we use a vector
         // bounded by zeroes to make this work
-        let gen = Generations::new(
-            vec![0, 1, 0, 1, 1, -1, -1, 0],
-            vec![],
-        );
+        let gen = Generations::new(vec![0, 1, 0, 1, 1, -1, -1, 0], vec![]);
 
         let mut gen = gen.with_rule(|current_gen, next_gen| {
             next_gen.push(0);
