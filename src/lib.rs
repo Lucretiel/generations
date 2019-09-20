@@ -19,6 +19,9 @@ use std::mem;
 /// It is implemented for all std data structures and many std types; feel free
 /// to add pull requests for any std types that you feel should be clearable
 pub trait Clearable {
+    // Clear this data structure, ideally without deallocating its memory.
+    // Puts the data structure in a "fresh" state to be written to during each
+    // new generation.
     fn clear(&mut self);
 }
 
@@ -31,12 +34,21 @@ macro_rules! clearable {
             }
         }
     };
-    (($($name:ident),* $(,)?)) => {
-        impl < $($name : Clearable),* > Clearable for ($($name,)*) {
+    (()) => {
+        impl Clearable for () {
+            #[inline(always)]
+            fn clear(&mut self) {}
+        }
+    };
+    (($head:ident $(, $tail:ident)* $(,)?)) => {
+        clearable!{($($tail),*)}
+
+        impl < $head: Clearable, $($tail: Clearable),* > Clearable for ($head, $($tail),*) {
             #[allow(non_snake_case)]
             fn clear(&mut self) {
-                let ($(ref mut $name,)*) = *self;
-                $(Clearable::clear($name);)*
+                let &mut (ref mut $head, $(ref mut $tail, )*) = self;
+                Clearable::clear($head);
+                $(Clearable::clear($tail);)*
             }
         }
     }
@@ -52,22 +64,8 @@ clearable! {collections::HashSet<T, S>}
 clearable! {collections::LinkedList<T>}
 clearable! {collections::VecDeque<T>}
 clearable! {ffi::OsString}
-clearable! {()}
-clearable! {(A)}
-clearable! {(A, B)}
-clearable! {(A, B, C)}
-clearable! {(A, B, C, D)}
-clearable! {(A, B, C, D, E)}
-clearable! {(A, B, C, D, E, F)}
-clearable! {(A, B, C, D, E, F, G)}
-clearable! {(A, B, C, D, E, F, G, H)}
-clearable! {(A, B, C, D, E, F, G, H, I)}
-clearable! {(A, B, C, D, E, F, G, H, I, J)}
-clearable! {(A, B, C, D, E, F, G, H, I, J, K)}
-clearable! {(A, B, C, D, E, F, G, H, I, J, K, L)}
-clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M)}
-clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N)}
-clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)}
+
+// This also recursively makes each smaller tuple type clearable
 clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)}
 
 impl<T: Clearable> Clearable for Box<T> {
@@ -81,24 +79,6 @@ impl<T: Clearable> Clearable for Option<T> {
         if let Some(value) = self.as_mut() {
             value.clear();
         }
-    }
-}
-
-/// For (defaultable) models, this helper function converts a stepper that
-/// takes a scratch generation by value (and returns it) to a version that
-/// takes a scratch generation by mutable reference and mutates it in place.
-/// In order to ensure panic safety, the value is replaced with a default if
-/// the stepper panics, to prevent double-frees and other unwinding issues.
-#[inline]
-fn transitioner<T: Default>(mut f: impl FnMut(&T, T) -> T) -> impl FnMut(&T, &mut T) {
-    // TODO: replace this with a version that uses ptr::read and ptr::write,
-    // and only write the default to scratch_gen_ref in the event of a panic.
-    // That version is much more complex, and I *think* LLVM can optimize this
-    // to the same thing (especially when there are no panicking code paths)
-    #[inline] move |current_gen_ref, scratch_gen_ref| {
-        let scratch_gen = mem::replace(scratch_gen_ref, T::default());
-        let mut next_gen = f(current_gen_ref, scratch_gen);
-        mem::swap(scratch_gen_ref, &mut next_gen);
     }
 }
 
@@ -197,18 +177,11 @@ impl<Model: Default + Clearable> Generations<Model> {
     pub fn new_defaulted(seed_generation: Model) -> Self {
         Self::new(seed_generation, Model::default())
     }
-
-    #[inline]
-    pub fn step_transition(&mut self, f: impl FnMut(&Model, Model) -> Model) -> &Model {
-        self.step(transitioner(f))
-    }
-
-    #[inline]
-    pub fn with_transition(self, f: impl FnMut(&Model, Model) -> Model) -> Simulation<Model, impl FnMut(&Model, &mut Model)> {
-        self.with_rule(transitioner(f))
-    }
 }
 
+/// A `Simulation` is a `Generations` instance combined with a stepping function.
+/// It allows you to repeatedly step through generations, using the same logic
+/// with each step.
 #[derive(Debug, Clone)]
 pub struct Simulation<Model: Clearable, Step: FnMut(&Model, &mut Model)> {
     generations: Generations<Model>,
