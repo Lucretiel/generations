@@ -237,6 +237,15 @@ impl<Model: Clearable> Generations<Model> {
         &self.scratch
     }
 
+    /// Advance the simulation 1 step using a stepping function, then return
+    /// a reference to the new generation. See [`step`][Generations::step] for
+    /// more details.
+    #[inline]
+    pub fn next(&mut self, stepper: impl FnOnce(&Model, &mut Model)) -> &Model {
+        self.step(stepper);
+        self.current()
+    }
+
     /// Replace the current generation with a new seed generation using a
     /// function. Has no effect on the existing scratch generation. The
     /// current generation is cleared before the seed function is called.
@@ -330,10 +339,19 @@ impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> 
         self.generations.current()
     }
 
-    /// Step the simulation using the stored stepping function.
+    /// Step the simulation using the stored stepping function. Returns a
+    /// reference to the *previously current* generation.
     #[inline]
     pub fn step(&mut self) -> &Model {
         self.generations.step(&mut self.stepper)
+    }
+
+    /// Advance the simulation 1 step using the stored stepping function,
+    /// then return a reference to the new generation.
+    #[inline]
+    pub fn next(&mut self) -> &Model {
+        self.step();
+        self.current()
     }
 
     /// Replace the current generation with a new seed generation using a
