@@ -179,9 +179,14 @@ impl<Model: Default + Clearable> Generations<Model> {
     }
 }
 
-/// A `Simulation` is a `Generations` instance combined with a stepping function.
-/// It allows you to repeatedly step through generations, using the same logic
-/// with each step.
+/// A [`Simulation`] is a [`Generations`] instance combined with a stepping
+/// function. It allows you to repeatedly step through generations, using
+/// the same logic with each step.
+///
+/// It provides a [`step`] method, which advances the simulaton with the
+/// underlying stepper.
+///
+/// It is constructed with the [`Generations::with_rule`] method.
 #[derive(Debug, Clone)]
 pub struct Simulation<Model: Clearable, Step: FnMut(&Model, &mut Model)> {
     generations: Generations<Model>,
