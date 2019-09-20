@@ -406,6 +406,9 @@ mod tests {
 
     #[test]
     fn basic_test() {
+        // This test checks essentially all of the functionality of the library.
+        // individual methods not covered here are covered by doctests.
+
         // For these tests, the model that we're using is a vector, where in
         // each generation, the new value is the sum of the old value and its
         // neighbors. For instance:
