@@ -28,7 +28,7 @@
 //! use generations::Generations;
 //!
 //! // Our model type is a vector. Any type that implements the `Clearable`
-//! // trait can be used as a model.
+//! // trait can be used as a model; this includes all std data structures.
 //! let initial_state = vec![0, 1, 0, 1, 1, -1, -1, 0];
 //!
 //! // A Generations instance stores our model, plus some scratch space to
@@ -77,9 +77,9 @@ use std::mem;
 /// It is implemented for all std data structures and many std types; feel free
 /// to add pull requests for any std types that you think should be clearable.
 pub trait Clearable {
-    // Clear this data structure, ideally without deallocating its memory.
-    // Puts the data structure in a "fresh" state to be written to during each
-    // new generation.
+    /// Clear this data structure, ideally without deallocating its memory.
+    /// Puts the data structure in a "fresh" state to be written to during each
+    /// new generation.
     fn clear(&mut self);
 }
 

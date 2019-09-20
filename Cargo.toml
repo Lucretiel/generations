@@ -1,10 +1,10 @@
 [package]
 name = "generations"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Nathan West <Lucretiel@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-license = "MIT"
+license = "MPLv2"
 description = "A simple utility for running generation-based simulations in Rust"
 repository = "https://github.com/Lucretiel/generations"
 
@@ -16,5 +16,5 @@ maintenance = { status = "actively-developed" }
 
 # docs.rs stuff
 [package.metadata.docs.rs]
-all-features = true
+# all-features = true
 # TODO: fork me on github banner
