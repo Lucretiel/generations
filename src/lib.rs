@@ -197,6 +197,7 @@ impl<Model: Clearable> Generations<Model> {
     /// assert_eq!(gen.current(), &[1, 2, 3, 4]);
     /// ```
     #[inline]
+    #[must_use]
     pub fn current(&self) -> &Model {
         &self.current
     }
@@ -235,15 +236,6 @@ impl<Model: Clearable> Generations<Model> {
         stepper(&self.current, &mut self.scratch);
         mem::swap(&mut self.current, &mut self.scratch);
         &self.scratch
-    }
-
-    /// Advance the simulation 1 step using a stepping function, then return
-    /// a reference to the new generation. See [`step`][Generations::step] for
-    /// more details.
-    #[inline]
-    pub fn next(&mut self, stepper: impl FnOnce(&Model, &mut Model)) -> &Model {
-        self.step(stepper);
-        self.current()
     }
 
     /// Replace the current generation with a new seed generation using a
@@ -335,6 +327,7 @@ impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> 
     /// the most recent step, or the seed generation if no steps have been
     /// performed.
     #[inline]
+    #[must_use]
     pub fn current(&self) -> &Model {
         self.generations.current()
     }
@@ -344,14 +337,6 @@ impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> 
     #[inline]
     pub fn step(&mut self) -> &Model {
         self.generations.step(&mut self.stepper)
-    }
-
-    /// Advance the simulation 1 step using the stored stepping function,
-    /// then return a reference to the new generation.
-    #[inline]
-    pub fn next(&mut self) -> &Model {
-        self.step();
-        self.current()
     }
 
     /// Replace the current generation with a new seed generation using a
