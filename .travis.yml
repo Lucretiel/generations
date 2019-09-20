@@ -1,0 +1,8 @@
+language: rust
+rust:
+  - stable
+  - beta
+  - nightly
+  # TODO: ensure that old versions of rust keep working?
+matrix:
+  fast_finish: true
