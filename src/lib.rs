@@ -25,11 +25,21 @@ pub trait Clearable {
 macro_rules! clearable {
     ($type:ident $(:: $type_tail:ident)* $(< $($param:ident $(: $bound:ident $(+ $tail:ident)* $(+)?)?),+ $(,)? >)?) => {
         impl $(< $($param $(: $bound $(+ $tail)*)? ,)+ >)? $crate::Clearable for $type $(:: $type_tail)* $(< $($param,)+ >)? {
+            #[inline]
             fn clear(&mut self) {
                 $type $(:: $type_tail)* ::clear(self)
             }
         }
     };
+    (($($name:ident),* $(,)?)) => {
+        impl < $($name : Clearable),* > Clearable for ($($name,)*) {
+            #[allow(non_snake_case)]
+            fn clear(&mut self) {
+                let ($(ref mut $name,)*) = *self;
+                $(Clearable::clear($name);)*
+            }
+        }
+    }
 }
 
 clearable! {Vec<T>}
@@ -42,6 +52,23 @@ clearable! {collections::HashSet<T, S>}
 clearable! {collections::LinkedList<T>}
 clearable! {collections::VecDeque<T>}
 clearable! {ffi::OsString}
+clearable! {()}
+clearable! {(A)}
+clearable! {(A, B)}
+clearable! {(A, B, C)}
+clearable! {(A, B, C, D)}
+clearable! {(A, B, C, D, E)}
+clearable! {(A, B, C, D, E, F)}
+clearable! {(A, B, C, D, E, F, G)}
+clearable! {(A, B, C, D, E, F, G, H)}
+clearable! {(A, B, C, D, E, F, G, H, I)}
+clearable! {(A, B, C, D, E, F, G, H, I, J)}
+clearable! {(A, B, C, D, E, F, G, H, I, J, K)}
+clearable! {(A, B, C, D, E, F, G, H, I, J, K, L)}
+clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M)}
+clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N)}
+clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)}
+clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)}
 
 impl<T: Clearable> Clearable for Box<T> {
     fn clear(&mut self) {
@@ -57,9 +84,31 @@ impl<T: Clearable> Clearable for Option<T> {
     }
 }
 
+/// For (defaultable) models, this helper function converts a stepper that
+/// takes a scratch generation by value (and returns it) to a version that
+/// takes a scratch generation by mutable reference and mutates it in place.
+/// In order to ensure panic safety, the value is replaced with a default if
+/// the stepper panics, to prevent double-frees and other unwinding issues.
+#[inline]
+fn transitioner<T: Default>(mut f: impl FnMut(&T, T) -> T) -> impl FnMut(&T, &mut T) {
+    // TODO: replace this with a version that uses ptr::read and ptr::write,
+    // and only write the default to scratch_gen_ref in the event of a panic.
+    // That version is much more complex, and I *think* LLVM can optimize this
+    // to the same thing (especially when there are no panicking code paths)
+    #[inline] move |current_gen_ref, scratch_gen_ref| {
+        let scratch_gen = mem::replace(scratch_gen_ref, T::default());
+        let mut next_gen = f(current_gen_ref, scratch_gen);
+        mem::swap(scratch_gen_ref, &mut next_gen);
+    }
+}
+
 /// This struct manages transitions between generations. It stores two models,
 /// one of which is considered "current" and the other "scratch". The [`step`][Generations::step]
-/// advances the simulation by
+/// method advances the simulation by calling a function with a reference to
+/// the current generation and a mutable reference to the scratch generation;
+/// the function uses the current generation to write the next generation out
+/// to the scratch generation, after which it becomes the new current generation
+/// (and the previous generation becomes the new scratch generation).
 #[derive(Debug, Clone)]
 pub struct Generations<Model: Clearable> {
     current: Model,
@@ -147,6 +196,16 @@ impl<Model: Default + Clearable> Generations<Model> {
     #[inline]
     pub fn new_defaulted(seed_generation: Model) -> Self {
         Self::new(seed_generation, Model::default())
+    }
+
+    #[inline]
+    pub fn step_transition(&mut self, f: impl FnMut(&Model, Model) -> Model) -> &Model {
+        self.step(transitioner(f))
+    }
+
+    #[inline]
+    pub fn with_transition(self, f: impl FnMut(&Model, Model) -> Model) -> Simulation<Model, impl FnMut(&Model, &mut Model)> {
+        self.with_rule(transitioner(f))
     }
 }
 
