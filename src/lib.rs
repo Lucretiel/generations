@@ -6,7 +6,7 @@
  * Copyright 2019 Nathan West
  */
 
-//TODO: no_std
+#![cfg_attr(not(test), no_std)]
 
 //! Generations is a utility library for running generation-based simulations,
 //! such as [Conway's Game of Life](https://www.wikiwand.com/en/Conway%27s_Game_of_Life),
@@ -35,8 +35,7 @@
 //! ```
 //! use generations::Generations;
 //!
-//! // Our model type is a vector. Any type that implements the `Clearable`
-//! // trait can be used as a model; this includes all std data structures.
+//! // Our model type is a vector.
 //! let initial_state = vec![0, 1, 0, 1, 1, -1, -1, 0];
 //!
 //! // A Generations instance stores our model, plus some scratch space to
@@ -48,6 +47,9 @@
 //! // A Simulation combines a Generations instance with a rule to apply with
 //! // each step of the simulation
 //! let mut sim = gens.with_rule(move |current_gen, next_gen| {
+//!     // Make sure to reset the `next_gen` to a blank state before continuing
+//!     next_gen.clear();
+//!
 //!     if let Some(&first) = current_gen.first() {
 //!         next_gen.push(first);
 //!     }
@@ -72,81 +74,8 @@
 //! assert_eq!(sim.current(), &[0, 21, 33, 30, 14, -3, -8, 0]);
 //! ```
 
-use std::collections;
-use std::ffi;
-use std::fmt;
-use std::mem;
-
-// TODO: make this derivable
-/// [`Clearable`] is a trait for data structures that can be cleared, especially
-/// without deallocating storage. Models used in [`Generations`] must be
-/// [`Clearable`], and the output generation will be cleared before each step.
-///
-/// It is implemented for all std data structures and many std types; feel free
-/// to add pull requests for any std types that you think should be clearable.
-pub trait Clearable {
-    /// Clear this data structure, ideally without deallocating its memory.
-    /// Puts the data structure in a "fresh" state to be written to during each
-    /// new generation.
-    fn clear(&mut self);
-}
-
-impl<T: Clearable> Clearable for Box<T> {
-    fn clear(&mut self) {
-        T::clear(self)
-    }
-}
-
-impl<T: Clearable> Clearable for Option<T> {
-    fn clear(&mut self) {
-        if let Some(value) = self {
-            value.clear();
-        }
-    }
-}
-
-macro_rules! clearable {
-    ($type:ident $(:: $type_tail:ident)* $(< $($param:ident $(: $bound:ident $(+ $tail:ident)* $(+)?)?),+ $(,)? >)?) => {
-        impl $(< $($param $(: $bound $(+ $tail)*)? ,)+ >)? $crate::Clearable for $type $(:: $type_tail)* $(< $($param,)+ >)? {
-            #[inline]
-            fn clear(&mut self) {
-                $type $(:: $type_tail)* ::clear(self)
-            }
-        }
-    };
-    (()) => {
-        impl Clearable for () {
-            #[inline(always)]
-            fn clear(&mut self) {}
-        }
-    };
-    (($head:ident $(, $tail:ident)* $(,)?)) => {
-        clearable!{($($tail),*)}
-
-        impl < $head: Clearable, $($tail: Clearable),* > Clearable for ($head, $($tail),*) {
-            #[allow(non_snake_case)]
-            fn clear(&mut self) {
-                let &mut (ref mut $head, $(ref mut $tail, )*) = self;
-                Clearable::clear($head);
-                $(Clearable::clear($tail);)*
-            }
-        }
-    }
-}
-
-clearable! {Vec<T>}
-clearable! {String}
-clearable! {collections::BTreeMap<K: Ord, V>}
-clearable! {collections::BTreeSet<T: Ord>}
-clearable! {collections::BinaryHeap<T>}
-clearable! {collections::HashMap<K, V, S>}
-clearable! {collections::HashSet<T, S>}
-clearable! {collections::LinkedList<T>}
-clearable! {collections::VecDeque<T>}
-clearable! {ffi::OsString}
-
-// This also recursively makes each smaller tuple type clearable
-clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)}
+use core::fmt;
+use core::mem;
 
 /// This struct manages transitions between generations. It stores two models,
 /// one of which is considered "current" and the other "scratch". The [`step`][Generations::step]
@@ -156,12 +85,12 @@ clearable! {(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)}
 /// to the scratch generation, after which it becomes the new current generation
 /// (and the previous generation becomes the new scratch generation).
 #[derive(Debug, Clone)]
-pub struct Generations<Model: Clearable> {
+pub struct Generations<Model> {
     current: Model,
     scratch: Model,
 }
 
-impl<Model: Clearable> Generations<Model> {
+impl<Model> Generations<Model> {
     /// Create a new `Generations` instance with a seed model, which will
     /// become the initial current generation, and a scratch generation.
     ///
@@ -185,6 +114,7 @@ impl<Model: Clearable> Generations<Model> {
     /// });
     /// ```
     #[inline]
+    #[must_use]
     pub fn new(seed: Model, scratch: Model) -> Self {
         Generations {
             current: seed,
@@ -212,10 +142,10 @@ impl<Model: Clearable> Generations<Model> {
 
     /// Advance the simulation 1 step using a stepping function. The stepping
     /// function takes a reference to the current generation and a mutable
-    /// reference to the new generation, which is cleared before the stepping
-    /// function is called. It is expected to advance the simulation by reading
-    /// the current genration and writing the next generation. After the
-    /// stepping function writes the new generation, it is marked as current.
+    /// reference to the new generation. The stepping function should advance
+    /// the simulation by reading the current genration and writing the next
+    /// generation. After the stepping function writes the new generation,
+    /// it is marked as current.
     ///
     /// This function returns a reference to the *previously current*
     /// generation, so that it can be compared if desired with the current
@@ -230,7 +160,7 @@ impl<Model: Clearable> Generations<Model> {
     /// let mut gen = Generations::new_cloned(vec![1, 2, 3, 4]);
     ///
     /// let prev = gen.step(|current_gen, next_gen| {
-    ///     assert!(next_gen.is_empty());
+    ///     next_gen.clear();
     ///     next_gen.extend(current_gen.iter().skip(1));
     ///     next_gen.extend(current_gen.first());
     /// });
@@ -240,29 +170,26 @@ impl<Model: Clearable> Generations<Model> {
     /// ```
     #[inline]
     pub fn step(&mut self, stepper: impl FnOnce(&Model, &mut Model)) -> &Model {
-        self.scratch.clear();
         stepper(&self.current, &mut self.scratch);
         mem::swap(&mut self.current, &mut self.scratch);
         &self.scratch
     }
 
     /// Replace the current generation with a new seed generation using a
-    /// function. Has no effect on the existing scratch generation. The
-    /// current generation is cleared before the seed function is called.
+    /// function. Has no effect on the existing scratch generation.
     ///
     /// ```
     /// use generations::Generations;
     ///
     /// let mut gen = Generations::new_defaulted(vec![1, 2, 3, 4]);
     /// gen.reset_with(|seed_gen| {
-    ///     assert!(seed_gen.is_empty());
+    ///     seed_gen.clear();
     ///     seed_gen.extend(&[5, 5, 5, 5]);
     /// });
     /// assert_eq!(gen.current(), &[5, 5, 5, 5]);
     /// ```
     #[inline]
     pub fn reset_with(&mut self, seeder: impl FnOnce(&mut Model)) {
-        self.current.clear();
         seeder(&mut self.current)
     }
 
@@ -289,6 +216,7 @@ impl<Model: Clearable> Generations<Model> {
     /// generation. See [`step`][Generations::step] for an explaination of
     /// the stepping function.
     #[inline]
+    #[must_use]
     pub fn with_rule<F: FnMut(&Model, &mut Model)>(self, stepper: F) -> Simulation<Model, F> {
         Simulation {
             generations: self,
@@ -297,21 +225,29 @@ impl<Model: Clearable> Generations<Model> {
     }
 }
 
-impl<Model: Clone + Clearable> Generations<Model> {
+impl<Model: Clone> Generations<Model> {
     /// Create a new `Generations` instance with a seed model. Clone the seed
-    /// model to create an initial scratch model. Note that the scratch model
-    /// is always cleared before each generation step.
+    /// model to create an initial scratch model.
     #[inline]
+    #[must_use]
     pub fn new_cloned(seed_generation: Model) -> Self {
         let scratch = seed_generation.clone();
         Self::new(seed_generation, scratch)
     }
+
+    /// Replace the current generation with a clone of a new seed generation.
+    /// Has no effect on the current scratch generation.
+    #[inline]
+    pub fn reset_from(&mut self, seed: &Model) {
+        self.current.clone_from(seed)
+    }
 }
 
-impl<Model: Default + Clearable> Generations<Model> {
+impl<Model: Default> Generations<Model> {
     /// Create a new `Generations` instance with a seed model. The Model type's
     /// default value is used as the initial scratch model.
     #[inline]
+    #[must_use]
     pub fn new_defaulted(seed_generation: Model) -> Self {
         Self::new(seed_generation, Model::default())
     }
@@ -326,12 +262,12 @@ impl<Model: Default + Clearable> Generations<Model> {
 ///
 /// It is constructed with the [`Generations::with_rule`] method.
 #[derive(Clone)]
-pub struct Simulation<Model: Clearable, Step: FnMut(&Model, &mut Model)> {
+pub struct Simulation<Model, Step> {
     generations: Generations<Model>,
     stepper: Step,
 }
 
-impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> {
+impl<Model, Step> Simulation<Model, Step> {
     /// Return a reference to the current generation, which is the result of
     /// the most recent step, or the seed generation if no steps have been
     /// performed.
@@ -339,13 +275,6 @@ impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> 
     #[must_use]
     pub fn current(&self) -> &Model {
         self.generations.current()
-    }
-
-    /// Step the simulation using the stored stepping function. Returns a
-    /// reference to the *previously current* generation.
-    #[inline]
-    pub fn step(&mut self) -> &Model {
-        self.generations.step(&mut self.stepper)
     }
 
     /// Replace the current generation with a new seed generation using a
@@ -371,9 +300,26 @@ impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> 
     }
 }
 
-impl<Model: fmt::Debug + Clearable, Step: FnMut(&Model, &mut Model)> fmt::Debug
-    for Simulation<Model, Step>
-{
+impl<Model: Clone, Step> Simulation<Model, Step> {
+    /// Replace the current generation with a clone of a new seed generation.
+    /// Has no effect on the current scratch generation.
+    #[inline]
+    pub fn reset_from(&mut self, seed: &Model) {
+        self.generations.reset_from(seed)
+    }
+}
+
+impl<Model, Step: FnMut(&Model, &mut Model)> Simulation<Model, Step> {
+    /// Step the simulation using the stored stepping function. Returns a
+    /// reference to the *previously current* generation.
+    #[inline]
+    pub fn step(&mut self) -> &Model {
+        self.generations.step(&mut self.stepper)
+    }
+}
+
+// TODO: default impl this, add a specialization for Step: Debug
+impl<Model: fmt::Debug, Step> fmt::Debug for Simulation<Model, Step> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Simulation")
             .field("generations", &self.generations)
@@ -382,9 +328,7 @@ impl<Model: fmt::Debug + Clearable, Step: FnMut(&Model, &mut Model)> fmt::Debug
     }
 }
 
-impl<Model: Clearable, Step: FnMut(&Model, &mut Model)> AsRef<Generations<Model>>
-    for Simulation<Model, Step>
-{
+impl<Model, Step> AsRef<Generations<Model>> for Simulation<Model, Step> {
     fn as_ref(&self) -> &Generations<Model> {
         &self.generations
     }
@@ -418,6 +362,7 @@ mod tests {
         let gen = Generations::new(vec![0, 1, 0, 1, 1, -1, -1, 0], vec![]);
 
         let mut gen = gen.with_rule(|current_gen, next_gen| {
+            next_gen.clear();
             next_gen.push(0);
 
             for window in current_gen.windows(3) {
@@ -441,7 +386,7 @@ mod tests {
 
     #[test]
     fn debug_print_test() {
-        // Simulations should be debug-printable.
+        // Simulations should be debug-printable when created with a closure
         let thing = Generations::new_defaulted(vec![0]).with_rule(|_c, _n| {});
         format!("{:?}", &thing);
     }

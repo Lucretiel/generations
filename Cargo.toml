@@ -1,6 +1,6 @@
 [package]
 name = "generations"
-version = "1.0.1"
+version = "2.0.0"
 authors = ["Nathan West <Lucretiel@gmail.com>"]
 edition = "2018"
 readme = "README.md"
@@ -16,5 +16,8 @@ maintenance = { status = "actively-developed" }
 
 # docs.rs stuff
 [package.metadata.docs.rs]
-# all-features = true
+all-features = true
 # TODO: fork me on github banner
+
+[features]
+# nightly = []
